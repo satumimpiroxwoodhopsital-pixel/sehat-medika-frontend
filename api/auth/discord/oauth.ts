@@ -7,15 +7,15 @@ const redirectUri = process.env.DISCORD_REDIRECT_URI!;
 export default async function handler(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get('code');
-  const type = url.searchParams.get('type') || 'patient';
 
-  // Step1: Redirect to Discord OAuth
+  // Step1: Redirect to Discord OAuth (no code yet)
   if (!code) {
-    const discordUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
+    const type = url.searchParams.get('type') || 'patient';
+    const discordUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=${type}`;
     return Response.redirect(discordUrl);
   }
 
-  // Step2: Exchange code for token
+  // Step2: Exchange code for token (Discord redirected back with code)
   const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -75,7 +75,9 @@ export default async function handler(req: Request) {
   // Step6: Create token and redirect to frontend
   const token = btoa(`${discordUser.id}:${Date.now()}`);
   const origin = new URL(req.url).origin;
-  const userType = adminUser ? 'admin' : 'patient';
+  // Read type from state parameter (set in Step1)
+  const stateType = url.searchParams.get('state') || 'patient';
+  const userType = stateType === 'admin' ? 'admin' : 'patient';
   const needsProfile = !patient?.profileCompleted;
 
   return Response.redirect(
