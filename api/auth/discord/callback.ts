@@ -1,8 +1,8 @@
-// Auth callback - redirects to frontend with token
+// Auth callback - redirects to oauth handler
 export default async function handler(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get('code');
-  const type = url.searchParams.get('type') || 'patient'; // 'patient' or 'admin'
+  const type = url.searchParams.get('type') || 'patient';
 
   if (!code) {
     return Response.redirect(
@@ -10,9 +10,9 @@ export default async function handler(req: Request) {
     );
   }
 
-  // Redirect to frontend with code for handling
-  const origin = new URL(req.url).origin;
+  // This should not be reached - Discord should redirect to oauth.ts
+  // Redirect to oauth handler with the code
   return Response.redirect(
-    `${origin}/auth/callback?code=${code}&type=${type}`
+    `/api/auth/discord/oauth?code=${code}&state=${type}`
   );
 }
