@@ -1,48 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { usePatientAuthStore } from '../stores/patientAuthStore';
 import { MessageCircle, Loader2 } from 'lucide-react';
 
 const PatientLogin = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login, patient, logout } = usePatientAuthStore();
+  const { login, patient, logout, loading: authLoading } = usePatientAuthStore();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-
-  // Handle OAuth callback
-  useEffect(() => {
-    const token = params.get('token');
-
-    if (token && patient) {
-      // Already have patient data, just redirect
-      if (patient.profileCompleted) {
-        navigate('/patient/dashboard', { replace: true });
-      } else {
-        navigate('/patient/profile', { replace: true });
-      }
-      return;
-    }
-
-    if (token) {
-      // Fetch patient data with token
-      fetch('/api/auth/discord/callback', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.patient) {
-            login({ ...data.patient, type: 'patient' });
-            if (data.needsProfile) {
-              navigate('/patient/profile');
-            } else {
-              navigate('/patient/dashboard');
-            }
-          }
-        })
-        .catch(() => setError('Authentication failed. Please try again.'));
-    }
-  }, [params, patient, navigate]);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -61,16 +26,18 @@ const PatientLogin = () => {
     }
   }, []);
 
-  const handleDiscordLogin = () => {
+  const handleDiscordLogin = async () => {
     setLoading(true);
-    // Redirect to Discord OAuth - use oauth.ts endpoint with state param for type
-    const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/api/auth/discord/oauth`;
-    const discordUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=patient`;
-    window.location.href = discordUrl;
+    setError('');
+    try {
+      await login();
+    } catch (e: any) {
+      setError('Authentication failed: ' + (e?.message || 'Please try again.'));
+      setLoading(false);
+    }
   };
 
-  if (patient) {
+  if (authLoading || patient) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -116,13 +83,6 @@ const PatientLogin = () => {
               <><MessageCircle className="w-5 h-5" /> Login with Discord</>
             )}
           </button>
-
-          <div className="mt-6 pt-6 border-t text-center">
-            <p className="text-xs text-gray-500 mb-2">Demo Mode</p>
-            <p className="text-xs text-gray-500">
-              Click the button above to simulate Discord OAuth login
-            </p>
-          </div>
         </div>
 
         {/* Back to Website */}

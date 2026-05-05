@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Lock, MessageCircle, Stethoscope, Loader2 } from 'lucide-react';
+import { MessageCircle, Stethoscope, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../utils/authStore';
+import { supabase } from '../../lib/supabase';
 
 const loginSchema = z.object({
-  discord_id: z.string().min(2, 'Discord ID is required'),
+  email: z.string().email('Valid email is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -16,35 +17,51 @@ type LoginFormData = z.infer<typeof loginSchema>;
 const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const login = useAuthStore((state) => state.login);
+  const { fetchProfile, user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
-
-  // Handle OAuth callback via /auth/callback - handled by AuthCallback.tsx
-  // This page only handles direct Discord ID + password login
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+  // Check for existing session
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate('/admin', { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  const onSubmit: SubmitHandler<LoginFormData> = async (data) => {
     setLoading(true);
     setError('');
 
-    const success = await login(data.discord_id, data.password);
-
+    const success = await useAuthStore.getState().login(data.email, data.password);
     if (success) {
-      navigate('/admin');
+      navigate('/admin', { replace: true });
     } else {
-      setError('Invalid Discord ID or password');
+      setError('Invalid email or password');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleDiscordLogin = () => {
-    const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/api/auth/discord/oauth`;
-    const discordUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=admin`;
-    window.location.href = discordUrl;
+  const handleDiscordLogin = async () => {
+    setLoading(true);
+    setError('');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'discord',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?type=admin`,
+      },
+    });
+    if (error) {
+      setError('Discord login failed: ' + error.message);
+      setLoading(false);
+    }
   };
 
   return (
@@ -62,33 +79,27 @@ const Login = () => {
         {/* Login Form */}
         <div className="bg-white rounded-2xl shadow-sm p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Discord ID */}
+            {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Discord ID</label>
-              <div className="relative">
-                <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  {...register('discord_id')}
-                  type="text"
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                  placeholder="admin#0001"
-                />
-              </div>
-              {errors.discord_id && <p className="text-red-500 text-sm mt-1">{errors.discord_id.message}</p>}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                {...register('email')}
+                type="email"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                placeholder="admin@sehatmedika.com"
+              />
+              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
             </div>
 
             {/* Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  {...register('password')}
-                  type="password"
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                  placeholder="Enter your password"
-                />
-              </div>
+              <input
+                {...register('password')}
+                type="password"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                placeholder="Enter your password"
+              />
               {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>}
             </div>
 
@@ -118,7 +129,8 @@ const Login = () => {
             <button
               type="button"
               onClick={handleDiscordLogin}
-              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors inline-flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
             >
               <MessageCircle className="w-5 h-5" /> Login with Discord
             </button>
@@ -128,9 +140,9 @@ const Login = () => {
           <div className="mt-6 pt-6 border-t">
             <p className="text-xs text-gray-500 mb-3">Demo Credentials:</p>
             <div className="space-y-2 text-xs text-gray-600">
-              <p><strong>Super Admin:</strong> admin#0001 / admin123</p>
-              <p><strong>Admin:</strong> staff#0002 / staff123</p>
-              <p><strong>Doctor:</strong> doctor#0003 / doctor123</p>
+              <p><strong>Super Admin:</strong> admin@sehatmedika.com / admin123</p>
+              <p><strong>Admin:</strong> staff@sehatmedika.com / staff123</p>
+              <p><strong>Doctor:</strong> doctor@sehatmedika.com / doctor123</p>
             </div>
           </div>
         </div>

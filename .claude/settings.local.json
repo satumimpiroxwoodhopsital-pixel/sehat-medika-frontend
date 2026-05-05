@@ -9,7 +9,9 @@
       "Bash(mv /tmp/new_file.tsx src/admin/pages/MedicalRecords.tsx)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(rm lib/supabase.ts)",
+      "Bash(rmdir lib/)"
     ]
   }
 }
