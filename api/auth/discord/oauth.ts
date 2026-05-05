@@ -1,20 +1,21 @@
 import { supabase } from '../../lib/supabase';
 
-const clientId = process.env.DISCORD_CLIENT_ID!;
+const clientId = process.env.VITE_DISCORD_CLIENT_ID || process.env.DISCORD_CLIENT_ID!;
 const clientSecret = process.env.DISCORD_CLIENT_SECRET!;
 const redirectUri = process.env.DISCORD_REDIRECT_URI!;
 
 export default async function handler(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get('code');
+  const type = url.searchParams.get('type') || 'patient';
 
-  // Step 1: Redirect to Discord OAuth
+  // Step1: Redirect to Discord OAuth
   if (!code) {
     const discordUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
     return Response.redirect(discordUrl);
   }
 
-  // Step 2: Exchange code for token
+  // Step2: Exchange code for token
   const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -26,15 +27,20 @@ export default async function handler(req: Request) {
       redirect_uri: redirectUri,
     }),
   });
-  const { access_token } = await tokenRes.json();
+  const tokenData = await tokenRes.json();
+  const { access_token } = tokenData;
 
-  // Step 3: Get Discord user info
+  if (!access_token) {
+    return new Response('Discord OAuth failed: ' + JSON.stringify(tokenData), { status: 400 });
+  }
+
+  // Step3: Get Discord user info
   const userRes = await fetch('https://discord.com/api/users/@me', {
     headers: { Authorization: `Bearer ${access_token}` },
   });
   const discordUser = await userRes.json();
 
-  // Step 4: Find or create patient in Supabase
+  // Step4: Find or create patient in Supabase
   let { data: patient } = await supabase
     .from('patients')
     .select('*')
@@ -59,20 +65,20 @@ export default async function handler(req: Request) {
     patient = data;
   }
 
-  // Step 5: Find or create admin user in Supabase
-  let { data: adminUser } = await supabase
+  // Step5: Find admin user in Supabase (by Discord ID)
+  const { data: adminUser } = await supabase
     .from('admin_users')
     .select('*')
-    .eq('discord_id', `${discordUser.username}#${discordUser.discriminator || '0000'}`)
+    .eq('discord_id', discordUser.id)
     .single();
 
-  // Step 6: Return JWT-like token (replace with real JWT in prod)
+  // Step6: Create token and redirect to frontend
   const token = btoa(`${discordUser.id}:${Date.now()}`);
-  const { password: _, ...userData } = adminUser || {};
+  const origin = new URL(req.url).origin;
+  const userType = adminUser ? 'admin' : 'patient';
+  const needsProfile = !patient?.profileCompleted;
 
-  return Response.json({
-    token,
-    user: patient ? { ...patient, type: 'patient' } : { ...userData, type: 'admin' },
-    needsProfile: !patient?.profileCompleted,
-  });
+  return Response.redirect(
+    `${origin}/auth/callback?token=${token}&type=${userType}&needsProfile=${needsProfile}`
+  );
 }

@@ -10,8 +10,9 @@ export default async function handler(req: Request) {
     );
   }
 
-  // Exchange code (handled in oauth.ts, this is just redirect)
+  // Redirect to frontend with code for handling
+  const origin = new URL(req.url).origin;
   return Response.redirect(
-    `${process.env.VITE_PUBLIC_URL || 'http://localhost:5174'}/auth/callback?code=${code}&type=${type}`
+    `${origin}/auth/callback?code=${code}&type=${type}`
   );
 }
