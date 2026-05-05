@@ -6,7 +6,8 @@
       "Bash(npm run *)",
       "Bash(taskkill //F //IM node.exe)",
       "Bash(awk 'NR==713{print; system\\(\"cat /tmp/lightbox_part.txt\"\\); next}1' src/admin/pages/MedicalRecords.tsx)",
-      "Bash(mv /tmp/new_file.tsx src/admin/pages/MedicalRecords.tsx)"
+      "Bash(mv /tmp/new_file.tsx src/admin/pages/MedicalRecords.tsx)",
+      "Bash(git add *)"
     ]
   }
 }

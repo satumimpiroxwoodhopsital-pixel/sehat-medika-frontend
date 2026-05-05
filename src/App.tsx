@@ -32,6 +32,7 @@ import PatientLogin from './pages/PatientLogin';
 import PatientDashboard from './pages/PatientDashboard';
 import PatientProfile from './pages/PatientProfile';
 import LoginChoice from './pages/LoginChoice';
+import AuthCallback from './pages/AuthCallback';
 
 function App() {
   return (
@@ -57,6 +58,9 @@ function App() {
 
         {/* Unified Login Choice */}
         <Route path="/login" element={<LoginChoice />} />
+
+        {/* Auth Callback */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
         {/* Admin Login */}
         <Route path="/admin/login" element={<Login />} />

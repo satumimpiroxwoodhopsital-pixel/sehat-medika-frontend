@@ -13,6 +13,7 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   login: (discord_id: string, password: string) => Promise<boolean>;
+  loginWithDiscordOAuth: (discord_id: string) => Promise<boolean>;
   logout: () => void;
   fetchProfile: () => Promise<void>;
 }
@@ -26,6 +27,22 @@ export const useAuthStore = create<AuthState>((set) => ({
     const res = await fetch('/api/admin-auth', {
       method: 'POST', body: JSON.stringify({ discord_id, password }),
       headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem('admin-token', data.token);
+      localStorage.setItem('admin-user', JSON.stringify(data.user));
+      set({ token: data.token, user: data.user, isAuthenticated: true });
+      return true;
+    }
+    return false;
+  },
+
+  loginWithDiscordOAuth: async (discord_id) => {
+    const res = await fetch('/api/admin-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discord_id, password: '__discord_oauth__' }),
     });
     const data = await res.json();
     if (data.token) {

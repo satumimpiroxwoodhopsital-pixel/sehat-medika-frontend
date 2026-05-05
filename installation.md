@@ -93,11 +93,15 @@ git push -u origin main
 
 ### 2.5 Add Demo Admin Users (Optional - for testing)
 ```sql
--- Run this in SQL Editor to add demo admin users
+-- If you get "column password does not exist", run this first:
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS password text;
+
+-- Replace discord_id values with actual Discord User IDs (not username#discriminator)
+-- To get your Discord User ID: Enable Developer Mode in Discord → Right-click your name → Copy User ID
 INSERT INTO admin_users (id, discord_id, name, password, role, permissions) VALUES
-  ('1', 'admin#0001', 'Dr. Admin', 'admin123', 'Super Admin', ARRAY['*']),
-  ('2', 'staff#0002', 'Dr. Staff', 'staff123', 'Admin', ARRAY['services:*', 'doctors:*', 'appointments:*', 'jobs:*', 'applications:*', 'pages:*']),
-  ('3', 'doctor#0003', 'Dr. Johnson', 'doctor123', 'Doctor', ARRAY['appointments:read', 'appointments:update', 'profile:update']);
+  ('1', 'YOUR_DISCORD_USER_ID_HERE', 'Dr. Admin', 'admin123', 'Super Admin', ARRAY['*']),
+  ('2', 'STAFF_DISCORD_USER_ID_HERE', 'Dr. Staff', 'staff123', 'Admin', ARRAY['services:*', 'doctors:*', 'appointments:*', 'jobs:*', 'applications:*', 'pages:*']),
+  ('3', 'DOCTOR_DISCORD_USER_ID_HERE', 'Dr. Johnson', 'doctor123', 'Doctor', ARRAY['appointments:read', 'appointments:update', 'profile:update']);
 ```
 
 ---
@@ -120,11 +124,11 @@ INSERT INTO admin_users (id, discord_id, name, password, role, permissions) VALU
 2. Click **Add Redirect**
 3. For local dev, add:
    ```
-   http://localhost:5174/api/auth/discord/callback
+   http://localhost:5174/api/auth/discord/oauth
    ```
 4. For production (after Vercel deploy), add:
    ```
-   https://your-app.vercel.app/api/auth/discord/callback
+   https://sehat-medika-frontend.vercel.app/api/auth/discord/oauth
    ```
 5. Click **Save Changes** at bottom
 
@@ -146,7 +150,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 # Discord OAuth (from Step 3)
 VITE_DISCORD_CLIENT_ID=1500262153054322910
 DISCORD_CLIENT_SECRET=nexnbTRFEhiO2u3m-uiFpOHPlnqxKpmq
-DISCORD_REDIRECT_URI=http://localhost:5174/api/auth/discord/callback
+DISCORD_REDIRECT_URI=http://localhost:5174/api/auth/discord/oauth
 ```
 
 ### 4.2 Verify `.gitignore` Excludes Env Files
@@ -215,7 +219,7 @@ In the deployment setup page, scroll to **Environment Variables**:
 | `VITE_SUPABASE_ANON_KEY` | `eyJhbGci...` | From Step 2.4 |
 | `VITE_DISCORD_CLIENT_ID` | `1500262153054322910` | From Step 3.1 |
 | `DISCORD_CLIENT_SECRET` | `nexnbTRFEhiO2u3m...` | From Step 3.2 |
-| `DISCORD_REDIRECT_URI` | `https://your-app.vercel.app/api/auth/discord/callback` | Replace with your Vercel URL |
+| `DISCORD_REDIRECT_URI` | `https://sehat-medika-frontend.vercel.app/api/auth/discord/oauth` | Replace with your Vercel URL |
 
 Click **Deploy**
 
@@ -228,12 +232,12 @@ Click **Deploy**
 2. After ~2 minutes: **Congratulations! Your project is deployed**
 
 ### 6.4 Update Discord Redirect URI
-1. Copy your Vercel URL (e.g., `https://sehat-medika.vercel.app`)
+1. Copy your Vercel URL (e.g., `https://sehat-medika-frontend.vercel.app`)
 2. Go to [discord.com/developers](https://discord.com/developers)
 3. Select your app → **OAuth2** → **General**
 4. Add redirect URI:
    ```
-   https://your-app.vercel.app/api/auth/discord/callback
+   https://sehat-medika-frontend.vercel.app/api/auth/discord/oauth
    ```
 5. Click **Save Changes**
 

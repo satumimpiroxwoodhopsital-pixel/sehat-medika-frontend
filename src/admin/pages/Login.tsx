@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,17 +18,9 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
-  const [params] = useSearchParams();
 
-  // Handle OAuth callback
-  useEffect(() => {
-    const token = params.get('token');
-    if (token) {
-      login('', '').then(() => {
-        navigate('/admin');
-      });
-    }
-  }, [params]);
+  // Handle OAuth callback via /auth/callback - handled by AuthCallback.tsx
+  // This page only handles direct Discord ID + password login
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -50,7 +42,7 @@ const Login = () => {
 
   const handleDiscordLogin = () => {
     const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/api/auth/discord/callback?type=admin`;
+    const redirectUri = `${window.location.origin}/api/auth/discord/oauth?type=admin`;
     const discordUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
     window.location.href = discordUrl;
   };
