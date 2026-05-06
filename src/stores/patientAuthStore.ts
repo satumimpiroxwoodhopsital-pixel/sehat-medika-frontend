@@ -25,7 +25,7 @@ interface PatientAuthState {
 
 export const usePatientAuthStore = create<PatientAuthState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       patient: null,
       isAuthenticated: false,
       loading: true,
@@ -57,7 +57,7 @@ export const usePatientAuthStore = create<PatientAuthState>()(
         // Get initial session
         supabase.auth.getSession().then(({ data }: any) => {
           if (data.session) {
-            get().initialize();
+            handleSignedIn(data.session);
           } else {
             set({ loading: false });
           }
@@ -66,28 +66,7 @@ export const usePatientAuthStore = create<PatientAuthState>()(
         // Listen for auth changes
         supabase.auth.onAuthStateChange((event: string, session: any) => {
           if (event === 'SIGNED_IN' && session) {
-            supabase
-              .from('patients')
-              .select('*')
-              .eq('user_id', session.user.id)
-              .single()
-              .then(({ data }: any) => {
-                if (data) {
-                  set({
-                    patient: {
-                      id: data.id,
-                      discord_id: data.discord_id || '',
-                      username: data.name,
-                      patientId: data.id,
-                      profileCompleted: !!data.profileCompleted,
-                    },
-                    isAuthenticated: true,
-                    loading: false,
-                  });
-                } else {
-                  set({ loading: false });
-                }
-              });
+            handleSignedIn(session);
           } else if (event === 'SIGNED_OUT') {
             set({ patient: null, isAuthenticated: false, loading: false });
           }
@@ -103,3 +82,72 @@ export const usePatientAuthStore = create<PatientAuthState>()(
     }
   )
 );
+
+// Helper to handle SIGNED_IN event
+async function handleSignedIn(session: any) {
+  const userId = session.user.id;
+  const discordId = session.user.user_metadata?.provider_id
+    || session.user.identities?.[0]?.id
+    || session.user.id;
+
+  // Try to find patient record
+  const { data } = await supabase
+    .from('patients')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (data) {
+    // Patient record exists
+    usePatientAuthStore.setState({
+      patient: {
+        id: data.id,
+        discord_id: data.discord_id || discordId,
+        username: data.name,
+        patientId: data.id,
+        profileCompleted: !!data.profile_completed,
+      },
+      isAuthenticated: true,
+      loading: false,
+    });
+  } else {
+    // Create new patient record
+    const newPatient = {
+      id: `patient_${Date.now()}`,
+      user_id: userId,
+      mrn: `MRN-${new Date().getFullYear()}-${String(Date.now()).slice(-3)}`,
+      name: session.user.user_metadata?.full_name || session.user.email || 'Discord User',
+      discord_id: discordId,
+      date_of_birth: '',
+      gender: 'male',
+      blood_type: 'O+',
+      phone: '',
+      allergies: [],
+      status: 'active',
+      registration_date: new Date().toISOString().split('T')[0],
+      profile_completed: false,
+    };
+
+    const { data: inserted } = await supabase
+      .from('patients')
+      .insert(newPatient)
+      .select()
+      .single();
+
+    if (inserted) {
+      usePatientAuthStore.setState({
+        patient: {
+          id: inserted.id,
+          discord_id: inserted.discord_id || discordId,
+          username: inserted.name,
+          patientId: inserted.id,
+          profileCompleted: false,
+        },
+        isAuthenticated: true,
+        loading: false,
+      });
+    } else {
+      usePatientAuthStore.setState({ loading: false });
+    }
+  }
+}

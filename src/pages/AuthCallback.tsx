@@ -1,52 +1,60 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePatientAuthStore } from '../stores/patientAuthStore';
 import { useAuthStore } from '../admin/utils/authStore';
 import { Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 
 const AuthCallback = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { patient, isAuthenticated: patientAuth } = usePatientAuthStore();
+  const { patient, isAuthenticated: patientAuth, loading } = usePatientAuthStore();
   const { isAuthenticated: adminAuth } = useAuthStore();
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const type = params.get('type') || 'patient';
 
-    supabase.auth.getSession().then(({ data }: any) => {
-      if (data.session) {
-        if (type === 'admin' || adminAuth) {
-          navigate('/admin/dashboard', { replace: true });
-        } else if (patient || patientAuth) {
-          if (patient?.profileCompleted) {
-            navigate('/patient/dashboard', { replace: true });
+    // If already authenticated, redirect
+    if (patient && patient.profileCompleted) {
+      navigate('/patient/dashboard', { replace: true });
+      return;
+    }
+    if (patient && !patient.profileCompleted) {
+      navigate('/patient/profile', { replace: true });
+      return;
+    }
+    if (adminAuth) {
+      navigate('/admin/dashboard', { replace: true });
+      return;
+    }
+
+    // If still loading after 5 seconds, redirect to login
+    const timer = setTimeout(() => {
+      if (loading) {
+        setError('Session not found. Redirecting to login...');
+        setTimeout(() => {
+          if (type === 'admin') {
+            navigate('/admin/login', { replace: true });
           } else {
-            navigate('/patient/profile', { replace: true });
+            navigate('/patient/login', { replace: true });
           }
-        } else {
-          setTimeout(() => {
-            const p = usePatientAuthStore.getState().patient;
-            if (p) {
-              if (p.profileCompleted) {
-                navigate('/patient/dashboard', { replace: true });
-              } else {
-                navigate('/patient/profile', { replace: true });
-              }
-            } else {
-              navigate('/patient/login', { replace: true });
-            }
-          }, 1000);
-        }
-      } else {
-        if (type === 'admin') {
-          navigate('/admin/login', { replace: true });
-        } else {
-          navigate('/patient/login', { replace: true });
-        }
+        }, 2000);
       }
-    });
-  }, [params, navigate, patient, patientAuth, adminAuth]);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [params, navigate, patient, patientAuth, adminAuth, loading]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-gray-600">Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
